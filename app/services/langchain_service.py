@@ -1,7 +1,9 @@
+#D:\AI_Project\n8n_wf_creator\app\services\langchain_service.py
+
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
-from langchain_openai import OpenAI
+from langchain_openai import ChatOpenAI
 from app.config import settings
 import logging
 
@@ -22,33 +24,62 @@ PROMPT = PromptTemplate(
 )
 
 def get_llm_chain():
-    logger.info("Initializing OpenAI LLM with provided settings.")
+    logger.info("Initializing OpenAI Chat LLM with provided settings.")
     try:
-        llm = OpenAI(
+        llm = ChatOpenAI(
+            model_name="gpt-4o",
             openai_api_key=settings.openai_api_key,
-            temperature=0.7
+            temperature=0.7,
+            max_tokens=16384,
         )
-        logger.info("OpenAI LLM initialized.")
+        logger.info("OpenAI Chat LLM initialized.")
     except Exception as e:
-        logger.error(f"Failed to initialize OpenAI LLM: {e}")
+        logger.error(f"Failed to initialize OpenAI Chat LLM: {e}")
         raise
 
     logger.info("Setting up ConversationBufferMemory.")
     memory = ConversationBufferMemory(
-        memory_key="history",           # ✅ REQUIRED to match the prompt
-        input_key="input",              # optional but good for clarity
+        memory_key="history",
+        input_key="input",
         human_prefix="User",
         ai_prefix="Assistant",
-        return_messages=False           # if you're not using ChatPromptTemplate
+        return_messages=True  # ✅ For chat models, this must be True
     )
     logger.info("ConversationBufferMemory set up.")
 
-    logger.info("Creating ConversationChain.")
-    chain = ConversationChain(
+    class TokenUsageConversationChain(ConversationChain):
+        def run(self, *args, **kwargs):
+            # Get messages before running the LLM
+            messages_before = memory.chat_memory.messages.copy() if hasattr(memory, 'chat_memory') else []
+            num_tokens_input = 0
+            if hasattr(self.llm, 'get_num_tokens_from_messages'):
+                try:
+                    num_tokens_input = self.llm.get_num_tokens_from_messages(messages_before)
+                except Exception as e:
+                    logger.warning(f"Could not calculate input token usage: {e}")
+            result = super().run(*args, **kwargs)
+            # Get messages after running the LLM
+            messages_after = memory.chat_memory.messages if hasattr(memory, 'chat_memory') else []
+            num_tokens_output = 0
+            if hasattr(self.llm, 'get_num_tokens_from_messages'):
+                try:
+                    num_tokens_output = self.llm.get_num_tokens_from_messages(messages_after)
+                except Exception as e:
+                    logger.warning(f"Could not calculate output token usage: {e}")
+                logger.info(f"Input tokens: {num_tokens_input}, Output tokens: {num_tokens_output - num_tokens_input}, Total tokens: {num_tokens_output}")
+                print(f"Input tokens: {num_tokens_input}, Output tokens: {num_tokens_output - num_tokens_input}, Total tokens: {num_tokens_output}")
+            else:
+                logger.warning("LLM does not support token counting.")
+            return result
+
+    logger.info("Creating ConversationChain with token usage logging.")
+    chain = TokenUsageConversationChain(
         llm=llm,
         prompt=PROMPT,
         memory=memory,
         verbose=True
     )
-    logger.info("ConversationChain created and ready.")
+    logger.info(f"ConversationChain created successfully with chain:{chain}")
     return chain
+
+

@@ -4,6 +4,7 @@ from app.schemas.request_response import WorkflowRequest, WorkflowResponse
 from app.services.langchain_service import get_llm_chain
 from app.utils.json_validator import extract_json_from_response, validate_n8n_workflow
 import logging
+from app.n8n_client import get_all_workflows
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -37,8 +38,18 @@ async def generate_workflow(request: WorkflowRequest):
             connections={},
             error=message
         )
-    logger.info("Workflow successfully generated.")
+    logger.info("Workflow successfully generated and validated.")
     return WorkflowResponse(**workflow_json)
+
+@app.get("/workflows")
+async def fetch_all_workflows():
+    try:
+        workflows = get_all_workflows()
+        return {"success": True, "data": workflows}
+    except Exception as e:
+        logger.error(f"Failed to fetch workflows: {str(e)}")
+        return {"success": False, "error": str(e)}
+    
 
 if __name__ == "__main__":
     import uvicorn
