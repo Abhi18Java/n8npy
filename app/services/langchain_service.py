@@ -6,8 +6,12 @@ from langchain.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from app.config import settings
 import logging
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
+import os
 
 logger = logging.getLogger(__name__)
+OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", settings.openai_api_key)
 
 logger.info("Loading workflow prompt template from app/prompts/workflow_prompt.txt")
 try:

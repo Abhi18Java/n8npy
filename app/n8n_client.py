@@ -1,12 +1,17 @@
 # D:\AI_Project\n8n_wf_creator\app\n8n_client.py
-
+import os
 import requests
 import logging
+from config import settings
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables from .env file
+
 
 logger = logging.getLogger(__name__)
 
-N8N_API_BASE_URL = "http://localhost:5678/api/v1"
-N8N_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjZWQ1Y2MyOC1kODAyLTQ0MWQtODQ3My0wN2YwNmE1M2QzNWQiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzUzNzc1Mzc5LCJleHAiOjE3NTYzNTM2MDB9.GERS-yLaLR2Lc1EKipJJw926awMVpY6O8fIkABMWvCs"
+N8N_API_BASE_URL = os.getenv("N8N_API_BASE_URL", settings.n8n_api_base_url)
+N8N_API_KEY = os.getenv("N8N_API_KEY", settings.n8n_api_key)
+
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -47,15 +52,3 @@ def create_workflow(workflow_json: dict) -> dict:
             "message": response.text
         }
     
-
-def get_all_workflows():
-    url = f"{N8N_API_BASE_URL}/workflows"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code == 200:
-        return {"success": True, "data": response.json()}
-    else:
-        return {
-            "success": False,
-            "status_code": response.status_code,
-            "message": response.text
-        }
