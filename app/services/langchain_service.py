@@ -15,7 +15,7 @@ OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", settings.openai_api_key)
 
 logger.info("Loading workflow prompt template from app/prompts/workflow_prompt.txt")
 try:
-    with open("app/prompts/workflow_prompt.txt", "r") as file:
+    with open("app/prompts/workflow_prompt.txt", "r" , encoding="utf-8") as file:
         prompt_template = file.read()
     logger.info("Prompt template loaded successfully.")
 except Exception as e:
