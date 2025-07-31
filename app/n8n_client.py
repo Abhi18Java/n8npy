@@ -2,7 +2,10 @@
 import os
 import requests
 import logging
-from config import settings
+try:
+    from app.config import settings  # For FastAPI/package usage
+except ImportError:
+    from config import settings      # For direct/script/Streamlit usage
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 
@@ -51,4 +54,28 @@ def create_workflow(workflow_json: dict) -> dict:
             "status_code": response.status_code,
             "message": response.text
         }
-    
+
+
+def n8n_get_all_workflows() -> dict:
+    url = f"{N8N_API_BASE_URL}/workflows"
+    try:
+        response = requests.get(url, headers=HEADERS)
+        logger.info(f"n8n API response status: {response.status_code}")
+        logger.info(f"n8n API response text: {response.text}")
+    except Exception as e:
+        logger.error(f"Exception while calling n8n API: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+    if response.status_code == 200:
+        return {
+            "success": True,
+            "data": response.json()
+        }
+    else:
+        return {
+            "success": False,
+            "error": response.text
+        }

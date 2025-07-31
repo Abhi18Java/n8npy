@@ -1,4 +1,5 @@
 # D:\AI_Project\n8n_wf_creator\app\main.py
+from app.n8n_client import n8n_get_all_workflows
 from fastapi import FastAPI
 from app.schemas.request_response import WorkflowRequest, WorkflowResponse
 from app.services.langchain_service import get_llm_chain
@@ -9,6 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="SMARTFLOW n8n Workflow Generator")
+
 
 @app.post("/generate-workflow", response_model=WorkflowResponse)
 async def generate_workflow(request: WorkflowRequest):
@@ -40,6 +42,16 @@ async def generate_workflow(request: WorkflowRequest):
     logger.info("Workflow successfully generated and validated.")
     return WorkflowResponse(**workflow_json)
 
+
+# Endpoint to get all workflows from n8n public API
+@app.get("/get_all_workflows")
+async def get_all_workflows_endpoint():
+    try:
+        result = n8n_get_all_workflows()
+        return result
+    except Exception as e:
+        logger.error(f"Failed to fetch workflows from n8n: {e}")
+        return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":
