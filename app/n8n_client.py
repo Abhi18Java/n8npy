@@ -5,7 +5,7 @@ import logging
 try:
     from app.config import settings  # For FastAPI/package usage
 except ImportError:
-    from config import settings      # For direct/script/Streamlit usage
+    from config_simple import settings  # For direct/script/Streamlit usage
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 
@@ -17,9 +17,16 @@ N8N_API_KEY = os.getenv("N8N_API_KEY", settings.n8n_api_key)
 
 
 HEADERS = {
-    "Content-Type": "application/json",
-    "X-N8N-API-KEY": N8N_API_KEY
+    "Content-Type": "application/json"
 }
+
+# Add API key only if it exists
+if N8N_API_KEY:
+    HEADERS["X-N8N-API-KEY"] = N8N_API_KEY
+
+logger.info(f"Using N8N_API_BASE_URL: {N8N_API_BASE_URL}")
+logger.info(f"Using N8N_API_KEY: {'Yes' if N8N_API_KEY else 'No'}")
+logger.info(f"Headers: {HEADERS}")
 
 
 def create_workflow(workflow_json: dict) -> dict:
@@ -31,6 +38,7 @@ def create_workflow(workflow_json: dict) -> dict:
         "settings": {}
     }
     logger.info(f"Sending workflow to n8n: {payload}")
+    logger.info(f"Headers: {HEADERS}")
     try:
         response = requests.post(url, headers=HEADERS, json=payload)
         logger.info(f"n8n API response status: {response.status_code}")
