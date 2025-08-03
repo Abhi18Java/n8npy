@@ -9,19 +9,43 @@ import logging
 from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 import os
+from langchain.chains import LLMChain
 
 logger = logging.getLogger(__name__)
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", settings.openai_api_key)
 
-logger.info("Loading workflow prompt template from app/prompts/workflow_prompt.txt")
-try:
-    with open("app/prompts/workflow_prompt.txt", "r" , encoding="utf-8") as file:
-        prompt_template = file.read()
-    logger.info("Prompt template loaded successfully.")
-except Exception as e:
-    logger.error(f"Failed to load prompt template: {e}")
-    prompt_template = ""
+def load_prompt_from_file():
+    prompt_path = os.path.join("app/prompts", "workflow_prompt.txt")
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        return f.read()
 
+# Load prompt template from file
+logger.info("Loading workflow prompt template from file")
+try:
+    prompt_template = load_prompt_from_file()
+    logger.info("Prompt template loaded successfully from file.")
+except Exception as e:
+    logger.error(f"Failed to load prompt template from file: {e}")
+    # Fallback to simple template
+    prompt_template = """You are an expert n8n workflow architect AI that generates fully functional n8n workflow JSONs.
+
+IMPORTANT: You must return ONLY a valid JSON object with this structure:
+{
+  "name": "workflow name",
+  "nodes": [...],
+  "connections": {...}
+}
+
+Do not include any explanations, descriptions, or text outside the JSON.
+
+Conversation history:
+{history}
+
+User prompt:
+{input}
+
+Return only the JSON workflow:"""
+    
 PROMPT = PromptTemplate(
     input_variables=["history", "input"],
     template=prompt_template
@@ -47,9 +71,18 @@ def get_llm_chain():
         input_key="input",
         human_prefix="User",
         ai_prefix="Assistant",
-        return_messages=True  # ✅ For chat models, this must be True
+        return_messages=True  # For chat models, this must be True
     )
     logger.info("ConversationBufferMemory set up.")
+
+    # 👇 Return the LLMChain with memory
+    return LLMChain(
+        prompt=PROMPT,  
+        llm=llm,
+        memory=memory,
+        verbose=True
+    )
+
 
     class TokenUsageConversationChain(ConversationChain):
         def run(self, *args, **kwargs):

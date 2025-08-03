@@ -1,2 +1,4 @@
+# Activate virtual environment and run uvicorn
+.\venv\Scripts\Activate.ps1
 $env:PYTHONPATH = "."
-py -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
