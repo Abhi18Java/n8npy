@@ -49,9 +49,18 @@ if view_all:
 # Show Create New Workflow form
 if st.session_state.show_create:
     st.subheader("Create New Workflow")
-    prompt = st.text_area("Enter your prompt to generate workflow:", key="create_prompt")
-    if st.button("Generate", key="generate_btn"):
-        if prompt.strip():
+    
+    # Create form for better Enter key handling
+    st.write("---")  # Separator line
+    with st.form("create_workflow_form", clear_on_submit=True):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            prompt = st.text_input("Enter your prompt to generate workflow:", key="create_prompt", placeholder="Create a workflow that...")
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)  # Add space for alignment
+            submitted = st.form_submit_button("Generate", use_container_width=True)
+        
+        if submitted and prompt.strip():
             logger.info(f"User prompt for workflow generation: {prompt}")
             with st.spinner("Generating workflow..."):
                 response = requests.post(
@@ -72,7 +81,7 @@ if st.session_state.show_create:
                 else:
                     logger.error(f"API request failed with status code: {response.status_code}")
                     st.error(f"API Error: {response.status_code}")
-        else:
+        elif submitted and not prompt.strip():
             st.warning("Please enter a prompt to generate workflow.")
 
 # Show workflows in sidebar when requested
@@ -128,7 +137,7 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
         wf_name = wf.get('name', 'Unknown Workflow')
         wf_id = wf.get('id', None)
         logger.info(f"Selected workflow: {wf_name}, ID: {wf_id}")
-        st.subheader(f"Chat with Workflow: {wf_name}")
+        st.subheader(f"Selected workflow: {wf_name}")
         
         # Show workflow details in an expander
         with st.expander("View Workflow Details"):
@@ -139,67 +148,83 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
         with st.expander("View Workflow Details"):
             st.write(wf)
 
-    st.write("💬 **Chat with your workflow**")
-    st.write("Ask questions about the workflow or request updates. Examples:")
-    st.write("- What does this workflow do?")
-    st.write("- How does this workflow work?")
-    st.write("- Update this workflow to add email notifications")
+    #st.write("💬 **Chat with your workflow**")
+    #st.write("Ask questions about the workflow or request updates. Examples:")
+    #st.write("- What does this workflow do?")
+    #st.write("- How does this workflow work?")
+    #st.write("- Update this workflow to add email notifications")
     
-    describe_prompt = st.text_area("Your message:", placeholder="What does this workflow do?", height=100)
-    if st.button("Send"):
+    # Chat input at the bottom using form for Enter key support
+    st.markdown("---")  # Separator line
+    with st.form("chat_form", clear_on_submit=True):
+         col1, col2 = st.columns([4, 1])
+    with col1:
+        describe_prompt = st.text_input("Your message:", placeholder="What does this workflow do?", key="chat_input")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # for spacing
+        send_clicked = st.form_submit_button("Send", use_container_width=True)
+
+    if send_clicked and describe_prompt.strip():
         logger.info(f"User prompt: {describe_prompt}")
-        
-        # Ask for info
-        if "what" in describe_prompt.lower() or "describe" in describe_prompt.lower():
-            with st.spinner("Asking AI to describe workflow..."):
-                logger.info("Sending describe request to API")
-                # Create a descriptive prompt for the AI
-                full_prompt = f"Analyze this n8n workflow and {describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
-                response = requests.post(
-                    f"{BASE_URL}/describe-workflow",
-                    json={"prompt": full_prompt}
-                )
-                logger.info(f"Describe response status: {response.status_code}")
-                if response.status_code == 200:
-                    data = response.json()
-                    st.success("Workflow described successfully!")
-                    st.write(data.get("description", "No description available"))
-                else:
-                    st.error("Failed to get description.")
-        # Update workflow
-        elif "update" in describe_prompt.lower() or "edit" in describe_prompt.lower():
-            if isinstance(wf, dict) and wf.get('id'):
-                with st.spinner("Updating workflow..."):
-                    logger.info(f"Sending update request for workflow ID: {wf['id']}")
-                    response = requests.put(
-                        f"{BASE_URL}/workflows/{wf['id']}",
-                        json={"prompt": describe_prompt}
+
+        # Handle the prompt based on context
+        if st.session_state.show_chat and st.session_state.selected_workflow:
+            wf = st.session_state.selected_workflow
+            # Your existing logic here
+            if "what" in describe_prompt.lower() or "describe" in describe_prompt.lower():
+                with st.spinner("Asking AI to describe workflow..."):
+                    logger.info("Sending describe request to API")
+                    full_prompt = f"Analyze this n8n workflow and {describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
+                    response = requests.post(
+                        f"{BASE_URL}/describe-workflow",
+                        json={"prompt": full_prompt}
                     )
-                    logger.info(f"Update response status: {response.status_code}")
+                    logger.info(f"Describe response status: {response.status_code}")
                     if response.status_code == 200:
-                        st.success("Workflow updated!")
-                        st.write(response.json())
+                        data = response.json()
+                        st.success("Workflow described successfully!")
+                        st.write(data.get("description", "No description available"))
                     else:
-                        st.error(f"Failed to update workflow. Status code: {response.status_code}")
-            else:
-                logger.error("Cannot update workflow: missing ID or invalid format")
-                st.error("Cannot update workflow: missing ID or invalid format")
-        else:
-            # For any other prompt, treat as description request
-            with st.spinner("Processing your request..."):
-                logger.info("Sending general request to describe API")
-                full_prompt = f"{describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
-                response = requests.post(
-                    f"{BASE_URL}/describe-workflow",
-                    json={"prompt": full_prompt}
-                )
-                logger.info(f"General response status: {response.status_code}")
-                if response.status_code == 200:
-                    data = response.json()
-                    st.success("Response:")
-                    st.write(data.get("description", "No response available"))
+                        st.error("Failed to get description.")
+            elif "update" in describe_prompt.lower() or "edit" in describe_prompt.lower():
+                if isinstance(wf, dict) and wf.get('id'):
+                    with st.spinner("Updating workflow..."):
+                        logger.info(f"Sending update request for workflow ID: {wf['id']}")
+                        response = requests.put(
+                            f"{BASE_URL}/workflows/{wf['id']}",
+                            json={"prompt": describe_prompt}
+                        )
+                        logger.info(f"Update response status: {response.status_code}")
+                        if response.status_code == 200:
+                            st.success("Workflow updated!")
+                            st.write(response.json())
+                        else:
+                            st.error(f"Failed to update workflow. Status code: {response.status_code}")
                 else:
-                    st.error("Failed to process request.")
+                    logger.error("Cannot update workflow: missing ID or invalid format")
+                    st.error("Cannot update workflow: missing ID or invalid format")
+            else:
+                with st.spinner("Processing your request..."):
+                    logger.info("Sending general request to describe API")
+                    full_prompt = f"{describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
+                    response = requests.post(
+                        f"{BASE_URL}/describe-workflow",
+                        json={"prompt": full_prompt}
+                    )
+                    logger.info(f"General response status: {response.status_code}")
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.success("Response:")
+                        st.write(data.get("description", "No response available"))
+                    else:
+                        st.error("Failed to process request.")
+        elif st.session_state.show_create:
+            # Optional: handle prompts in create mode if necessary
+            pass
+
+        elif send_clicked and not describe_prompt.strip():
+            st.warning("Please enter a message before sending.")
+
 
 # Show default message when no workflow is selected and no action is taken
 if not st.session_state.show_chat and not st.session_state.show_create and not st.session_state.show_workflows:
