@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 st.set_page_config(layout="wide")
-st.title("Welcome to SMARTFLOW n8n Workflow Generator")
+st.title("Welcome to n8n Workflow Generator")
 st.markdown("This is an AI-powered n8n workflow generator. Enter your request and let the AI do the rest!")
 # Sidebar layout
 st.sidebar.header("Menu")
@@ -68,10 +68,10 @@ if st.session_state.show_create:
     with st.form("create_workflow_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            prompt = st.text_input("", key="create_prompt", placeholder="Create a workflow that...")
+            prompt = st.text_input("", key="create_prompt", placeholder="Write your message")
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)  # Add space for alignment
-            submitted = st.form_submit_button("Generate", use_container_width=True)
+            submitted = st.form_submit_button("Send", use_container_width=True)
         
         if submitted and prompt.strip():
             logger.info(f"User prompt for workflow generation: {prompt}")
@@ -207,7 +207,7 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
         st.markdown("---")
     else:
         # Add vertical spacing when no chat history
-        st.markdown("<div style='height: 300px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height: 250px;'></div>", unsafe_allow_html=True)
     
     with st.form("chat_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
