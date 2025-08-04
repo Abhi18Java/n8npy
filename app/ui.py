@@ -30,6 +30,10 @@ if "show_chat" not in st.session_state:
     st.session_state.show_chat = False
 if "show_create" not in st.session_state:
     st.session_state.show_create = False
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
+if "create_chat_messages" not in st.session_state:
+    st.session_state.create_chat_messages = []
 
 # Create New Workflow
 if create_new:
@@ -50,37 +54,80 @@ if view_all:
 if st.session_state.show_create:
     st.subheader("Create New Workflow")
     
-    # Create form for better Enter key handling
-    st.write("---")  # Separator line
+    # Display create workflow chat history
+    if st.session_state.create_chat_messages:
+        for message in st.session_state.create_chat_messages:
+            if message["role"] == "user":
+                st.markdown(f"**You:** {message['content']}")
+            else:
+                st.markdown(f"**AI:** {message['content']}")
+        st.markdown("---")
+    else:
+        # Add vertical spacing when no chat history
+        st.markdown("<div style='height: 300px;'></div>", unsafe_allow_html=True)
     with st.form("create_workflow_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            prompt = st.text_input("Enter your prompt to generate workflow:", key="create_prompt", placeholder="Create a workflow that...")
+            prompt = st.text_input("", key="create_prompt", placeholder="Create a workflow that...")
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)  # Add space for alignment
             submitted = st.form_submit_button("Generate", use_container_width=True)
         
         if submitted and prompt.strip():
             logger.info(f"User prompt for workflow generation: {prompt}")
-            with st.spinner("Generating workflow..."):
-                response = requests.post(
-                    f"{BASE_URL}/generate-workflow",
-                    json={"prompt": prompt}
-                )
-                logger.info(f"API request sent to {BASE_URL}/generate-workflow")
-                if response.status_code == 200:
-                    data = response.json()
-                    logger.info(f"API response received: {data}")
-                    if data.get("error"):
-                        logger.error(f"Error received from API: {data['error']}")
-                        st.error(f"Error: {data['error']}")
+            
+            # Add user message to create chat history
+            st.session_state.create_chat_messages.append({"role": "user", "content": prompt})
+            
+            # Check if this is a workflow creation request or generic message
+            workflow_keywords = ["create", "workflow", "generate", "build", "make", "design"]
+            is_workflow_request = any(keyword in prompt.lower() for keyword in workflow_keywords)
+            
+            if is_workflow_request:
+                # Try to generate workflow
+                with st.spinner("Generating workflow..."):
+                    response = requests.post(
+                        f"{BASE_URL}/generate-workflow",
+                        json={"prompt": prompt}
+                    )
+                    logger.info(f"API request sent to {BASE_URL}/generate-workflow")
+                    if response.status_code == 200:
+                        data = response.json()
+                        logger.info(f"API response received: {data}")
+                        if data.get("error") or data.get("name") == "Error Workflow":
+                            logger.error(f"Error received from API: {data.get('error', 'Unknown error')}")
+                            ai_response = f"Error: {data.get('error', 'Could not generate workflow')}"
+                            st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
+                            st.rerun()
+                        else:
+                            logger.info("Workflow generated successfully.")
+                            ai_response = "Workflow generated successfully! Please check your n8n instance."
+                            st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
+                            st.rerun()
                     else:
-                        logger.info("Workflow generated successfully.")
-                        st.success("Workflow generated successfully!")
-                        st.json(data)
-                else:
-                    logger.error(f"API request failed with status code: {response.status_code}")
-                    st.error(f"API Error: {response.status_code}")
+                        logger.error(f"API request failed with status code: {response.status_code}")
+                        ai_response = f"API Error: {response.status_code}"
+                        st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
+                        st.rerun()
+            else:
+                # Handle as generic message
+                with st.spinner("Processing your message..."):
+                    response = requests.post(
+                        f"{BASE_URL}/describe-workflow",
+                        json={"prompt": prompt}
+                    )
+                    logger.info(f"API request sent to {BASE_URL}/describe-workflow")
+                    if response.status_code == 200:
+                        data = response.json()
+                        logger.info(f"API response received: {data}")
+                        ai_response = data.get("description", "I'm here to help you with n8n workflows!")
+                        st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
+                        st.rerun()
+                    else:
+                        logger.error(f"API request failed with status code: {response.status_code}")
+                        ai_response = "I'm here to help you with n8n workflows! Try asking me to create a workflow."
+                        st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
+                        st.rerun()
         elif submitted and not prompt.strip():
             st.warning("Please enter a prompt to generate workflow.")
 
@@ -117,6 +164,7 @@ if st.session_state.show_workflows:
                                 logger.info(f"Selected workflow: {wf_name}")
                                 st.session_state.selected_workflow = wf
                                 st.session_state.show_chat = True
+                                st.session_state.chat_messages = []  # Clear chat history for new workflow
                                 st.rerun()
                     else:
                         logger.warning("No workflows found in response")
@@ -147,81 +195,96 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
         st.subheader(f"Chat with Workflow: {wf}")
         with st.expander("View Workflow Details"):
             st.write(wf)
-
-    #st.write("💬 **Chat with your workflow**")
-    #st.write("Ask questions about the workflow or request updates. Examples:")
-    #st.write("- What does this workflow do?")
-    #st.write("- How does this workflow work?")
-    #st.write("- Update this workflow to add email notifications")
     
-    # Chat input at the bottom using form for Enter key support
-    st.markdown("---")  # Separator line
-    with st.form("chat_form", clear_on_submit=True):
-         col1, col2 = st.columns([4, 1])
-    with col1:
-        describe_prompt = st.text_input("Your message:", placeholder="What does this workflow do?", key="chat_input")
-    with col2:
-        st.markdown("<br>", unsafe_allow_html=True)  # for spacing
-        send_clicked = st.form_submit_button("Send", use_container_width=True)
-
-    if send_clicked and describe_prompt.strip():
-        logger.info(f"User prompt: {describe_prompt}")
-
-        # Handle the prompt based on context
-        if st.session_state.show_chat and st.session_state.selected_workflow:
-            wf = st.session_state.selected_workflow
-            # Your existing logic here
-            if "what" in describe_prompt.lower() or "describe" in describe_prompt.lower():
-                with st.spinner("Asking AI to describe workflow..."):
-                    logger.info("Sending describe request to API")
-                    full_prompt = f"Analyze this n8n workflow and {describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
-                    response = requests.post(
-                        f"{BASE_URL}/describe-workflow",
-                        json={"prompt": full_prompt}
-                    )
-                    logger.info(f"Describe response status: {response.status_code}")
-                    if response.status_code == 200:
-                        data = response.json()
-                        st.success("Workflow described successfully!")
-                        st.write(data.get("description", "No description available"))
-                    else:
-                        st.error("Failed to get description.")
-            elif "update" in describe_prompt.lower() or "edit" in describe_prompt.lower():
-                if isinstance(wf, dict) and wf.get('id'):
-                    with st.spinner("Updating workflow..."):
-                        logger.info(f"Sending update request for workflow ID: {wf['id']}")
-                        response = requests.put(
-                            f"{BASE_URL}/workflows/{wf['id']}",
-                            json={"prompt": describe_prompt}
-                        )
-                        logger.info(f"Update response status: {response.status_code}")
-                        if response.status_code == 200:
-                            st.success("Workflow updated!")
-                            st.write(response.json())
-                        else:
-                            st.error(f"Failed to update workflow. Status code: {response.status_code}")
-                else:
-                    logger.error("Cannot update workflow: missing ID or invalid format")
-                    st.error("Cannot update workflow: missing ID or invalid format")
+    # Display chat history
+    if st.session_state.chat_messages:
+       # st.write("💬 **Chat History:**")
+        for message in st.session_state.chat_messages:
+            if message["role"] == "user":
+                st.markdown(f"**You:** {message['content']}")
             else:
-                with st.spinner("Processing your request..."):
-                    logger.info("Sending general request to describe API")
-                    full_prompt = f"{describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
-                    response = requests.post(
-                        f"{BASE_URL}/describe-workflow",
-                        json={"prompt": full_prompt}
-                    )
-                    logger.info(f"General response status: {response.status_code}")
-                    if response.status_code == 200:
-                        data = response.json()
-                        st.success("Response:")
-                        st.write(data.get("description", "No response available"))
-                    else:
-                        st.error("Failed to process request.")
-        elif st.session_state.show_create:
-            # Optional: handle prompts in create mode if necessary
-            pass
+                st.markdown(f"**AI:** {message['content']}")
+        st.markdown("---")
+    else:
+        # Add vertical spacing when no chat history
+        st.markdown("<div style='height: 300px;'></div>", unsafe_allow_html=True)
+    
+    with st.form("chat_form", clear_on_submit=True):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            describe_prompt = st.text_input("", placeholder="Write your message", key="chat_input")
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)  # for spacing
+            send_clicked = st.form_submit_button("Send", use_container_width=True)
+        
+        if send_clicked and describe_prompt.strip():
+            logger.info(f"User prompt: {describe_prompt}")
+            
+            # Add user message to chat history
+            st.session_state.chat_messages.append({"role": "user", "content": describe_prompt})
 
+            # Handle the prompt based on context
+            if st.session_state.show_chat and st.session_state.selected_workflow:
+                wf = st.session_state.selected_workflow
+                # Your existing logic here
+                if "what" in describe_prompt.lower() or "describe" in describe_prompt.lower() or "explain" in describe_prompt.lower():
+                    with st.spinner("Asking AI to describe workflow..."):
+                        logger.info("Sending describe request to API")
+                        full_prompt = f"Analyze this n8n workflow and {describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
+                        response = requests.post(
+                            f"{BASE_URL}/describe-workflow",
+                            json={"prompt": full_prompt}
+                        )
+                        logger.info(f"Describe response status: {response.status_code}")
+                        if response.status_code == 200:
+                            data = response.json()
+                            ai_response = data.get("description", "No description available")
+                            st.session_state.chat_messages.append({"role": "ai", "content": ai_response})
+                            st.rerun()
+                        else:
+                            error_msg = "Failed to get description."
+                            st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
+                            st.rerun()
+                elif "update" in describe_prompt.lower() or "edit" in describe_prompt.lower():
+                    if isinstance(wf, dict) and wf.get('id'):
+                        with st.spinner("Updating workflow..."):
+                            logger.info(f"Sending update request for workflow ID: {wf['id']}")
+                            response = requests.put(
+                                f"{BASE_URL}/workflows/{wf['id']}",
+                                json={"prompt": describe_prompt}
+                            )
+                            logger.info(f"Update response status: {response.status_code}")
+                            if response.status_code == 200:
+                                ai_response = "Workflow updated successfully, please check n8n UI!"
+                                st.session_state.chat_messages.append({"role": "ai", "content": ai_response})
+                                st.rerun()
+                            else:
+                                error_msg = f"Failed to update workflow. Status code: {response.status_code}"
+                                st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
+                                st.rerun()
+                    else:
+                        error_msg = "Cannot update workflow: missing ID or invalid format"
+                        st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
+                        st.rerun()
+                else:
+                    with st.spinner("Processing your request..."):
+                        logger.info("Sending general request to describe API")
+                        full_prompt = f"{describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
+                        response = requests.post(
+                            f"{BASE_URL}/describe-workflow",
+                            json={"prompt": full_prompt}
+                        )
+                        logger.info(f"General response status: {response.status_code}")
+                        if response.status_code == 200:
+                            data = response.json()
+                            ai_response = data.get("description", "No response available")
+                            st.session_state.chat_messages.append({"role": "ai", "content": ai_response})
+                            st.rerun()
+                        else:
+                            error_msg = "Failed to process request."
+                            st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
+                            st.rerun()
+        
         elif send_clicked and not describe_prompt.strip():
             st.warning("Please enter a message before sending.")
 
