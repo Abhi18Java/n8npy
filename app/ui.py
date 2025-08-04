@@ -226,55 +226,42 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
             # Handle the prompt based on context
             if st.session_state.show_chat and st.session_state.selected_workflow:
                 wf = st.session_state.selected_workflow
-                # Your existing logic here
-                if "what" in describe_prompt.lower() or "describe" in describe_prompt.lower() or "explain" in describe_prompt.lower():
-                    with st.spinner("Asking AI to describe workflow..."):
-                        logger.info("Sending describe request to API")
-                        full_prompt = f"Analyze this n8n workflow and {describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
-                        response = requests.post(
-                            f"{BASE_URL}/describe-workflow",
-                            json={"prompt": full_prompt}
+                
+                # Detect if this is an update/modification request
+                update_indicators = [
+                    "add", "remove", "change", "modify", "update", "edit", "replace", "insert",
+                    "delete", "include", "use", "connect", "from the last node", "after", "before",
+                    "should include", "task should", "create a task", "send to", "integrate with"
+                ]
+                
+                is_update_request = any(indicator in describe_prompt.lower() for indicator in update_indicators)
+                
+                if is_update_request and isinstance(wf, dict) and wf.get('id'):
+                    with st.spinner("Updating workflow..."):
+                        logger.info(f"Detected update request for workflow ID: {wf['id']}")
+                        response = requests.put(
+                            f"{BASE_URL}/workflows/{wf['id']}",
+                            json={"prompt": describe_prompt}
                         )
-                        logger.info(f"Describe response status: {response.status_code}")
+                        logger.info(f"Update response status: {response.status_code}")
                         if response.status_code == 200:
-                            data = response.json()
-                            ai_response = data.get("description", "No description available")
+                            ai_response = "Workflow updated successfully, please check n8n UI!"
                             st.session_state.chat_messages.append({"role": "ai", "content": ai_response})
                             st.rerun()
                         else:
-                            error_msg = "Failed to get description."
+                            error_msg = f"Failed to update workflow. Status code: {response.status_code}"
                             st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
                             st.rerun()
-                elif "update" in describe_prompt.lower() or "edit" in describe_prompt.lower():
-                    if isinstance(wf, dict) and wf.get('id'):
-                        with st.spinner("Updating workflow..."):
-                            logger.info(f"Sending update request for workflow ID: {wf['id']}")
-                            response = requests.put(
-                                f"{BASE_URL}/workflows/{wf['id']}",
-                                json={"prompt": describe_prompt}
-                            )
-                            logger.info(f"Update response status: {response.status_code}")
-                            if response.status_code == 200:
-                                ai_response = "Workflow updated successfully, please check n8n UI!"
-                                st.session_state.chat_messages.append({"role": "ai", "content": ai_response})
-                                st.rerun()
-                            else:
-                                error_msg = f"Failed to update workflow. Status code: {response.status_code}"
-                                st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
-                                st.rerun()
-                    else:
-                        error_msg = "Cannot update workflow: missing ID or invalid format"
-                        st.session_state.chat_messages.append({"role": "ai", "content": error_msg})
-                        st.rerun()
                 else:
+                    # Handle as description/analysis request
                     with st.spinner("Processing your request..."):
-                        logger.info("Sending general request to describe API")
-                        full_prompt = f"{describe_prompt}. Here's the workflow: {json.dumps(wf, indent=2)}"
+                        logger.info("Sending request to describe API")
+                        full_prompt = f"{describe_prompt}. Here's the workflow context: {json.dumps(wf, indent=2)}"
                         response = requests.post(
                             f"{BASE_URL}/describe-workflow",
                             json={"prompt": full_prompt}
                         )
-                        logger.info(f"General response status: {response.status_code}")
+                        logger.info(f"Response status: {response.status_code}")
                         if response.status_code == 200:
                             data = response.json()
                             ai_response = data.get("description", "No response available")
