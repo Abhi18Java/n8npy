@@ -10,8 +10,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 st.set_page_config(layout="wide")
-st.title("SMARTFLOW n8n Workflow Generator")
-
+st.title("Welcome to SMARTFLOW n8n Workflow Generator")
+st.markdown("This is an AI-powered n8n workflow generator. Enter your request and let the AI do the rest!")
 # Sidebar layout
 st.sidebar.header("Menu")
 create_new = st.sidebar.button("Create New Workflow")
@@ -291,6 +291,5 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
 
 # Show default message when no workflow is selected and no action is taken
 if not st.session_state.show_chat and not st.session_state.show_create and not st.session_state.show_workflows:
-    st.write("### Welcome to SMARTFLOW n8n Workflow Generator")
     st.write("- Click **'Create New Workflow'** to generate a new workflow")
     st.write("- Click **'Your Workflows'** to view and interact with existing workflows")
