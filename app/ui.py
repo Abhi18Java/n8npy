@@ -10,6 +10,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 st.set_page_config(layout="wide")
+
+# CSS to remove border form container
+st.markdown("""
+<style>
+.st-emotion-cache-zuyloh {
+    border: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.title("Welcome to n8n Workflow Generator")
 st.markdown("This is an AI-powered n8n workflow generator. Enter your request and let the AI do the rest!")
 # Sidebar layout
@@ -125,7 +135,10 @@ if st.session_state.show_create:
                         st.rerun()
                     else:
                         logger.error(f"API request failed with status code: {response.status_code}")
-                        ai_response = "I'm here to help you with n8n workflows! Try asking me to create a workflow."
+                        if response.status_code == 500:
+                            ai_response = "Sorry, I'm experiencing high demand right now. Please try again in a moment."
+                        else:
+                            ai_response = "I'm here to help you with n8n workflows! Try asking me to create a workflow."
                         st.session_state.create_chat_messages.append({"role": "ai", "content": ai_response})
                         st.rerun()
         elif submitted and not prompt.strip():
@@ -170,8 +183,12 @@ if st.session_state.show_workflows:
                         logger.warning("No workflows found in response")
                         st.info("No workflows found.")
                 else:
-                    logger.error(f"API returned error: {data.get('error')}")
-                    st.error(f"Error: {data.get('error')}")
+                    error_msg = data.get('error', 'Unknown error')
+                    logger.error(f"API returned error: {error_msg}")
+                    if "No connection could be made" in error_msg or "Connection refused" in error_msg:
+                        st.error("❌ n8n instance is not running. Please start your n8n instance on localhost:5678")
+                    else:
+                        st.error(f"Error: {error_msg}")
             else:
                 logger.error(f"API request failed with status: {response.status_code}")
                 st.error(f"API Error: {response.status_code}")
@@ -212,7 +229,7 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
     with st.form("chat_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            describe_prompt = st.text_input("", placeholder="Write your message", key="chat_input")
+            describe_prompt = st.text_input("Message", placeholder="Write your message", key="chat_input", label_visibility="collapsed")
         with col2:
             st.markdown("<br>", unsafe_allow_html=True)  # for spacing
             send_clicked = st.form_submit_button("Send", use_container_width=True)
