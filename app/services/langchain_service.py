@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 load_dotenv()  # Load environment variables from .env file
 import os
 from langchain.chains import LLMChain
+import time
+import random
+from openai import RateLimitError
 
 logger = logging.getLogger(__name__)
 OPEN_AI_API_KEY = os.getenv("OPENAI_API_KEY", settings.openai_api_key)
@@ -59,6 +62,8 @@ def get_llm_chain():
             openai_api_key=settings.openai_api_key,
             temperature=0.7,
             max_tokens=16384,
+            max_retries=3,
+            request_timeout=60
         )
         logger.info("OpenAI Chat LLM initialized.")
     except Exception as e:
@@ -75,8 +80,34 @@ def get_llm_chain():
     )
     logger.info("ConversationBufferMemory set up.")
 
-    # 👇 Return the LLMChain with memory
-    return LLMChain(
+    # Create a custom LLMChain with rate limiting
+    class RateLimitedLLMChain(LLMChain):
+        def run(self, *args, **kwargs):
+            max_retries = 5
+            base_delay = 1
+            
+            for attempt in range(max_retries):
+                try:
+                    return super().run(*args, **kwargs)
+                except Exception as e:
+                    error_str = str(e).lower()
+                    if "429" in error_str or "rate limit" in error_str or "too many requests" in error_str:
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                            logger.warning(f"Rate limit hit, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
+                            time.sleep(delay)
+                            continue
+                        else:
+                            logger.error(f"Max retries exceeded for rate limiting: {e}")
+                            raise Exception("OpenAI API rate limit exceeded. Please try again later.")
+                    else:
+                        logger.error(f"Non-rate-limit error: {e}")
+                        raise
+            
+            raise Exception("Unexpected error in rate limited chain")
+    
+    # Return the custom LLMChain with rate limiting
+    return RateLimitedLLMChain(
         prompt=PROMPT,  
         llm=llm,
         memory=memory,

@@ -78,9 +78,8 @@ if st.session_state.show_create:
     with st.form("create_workflow_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            prompt = st.text_input("", key="create_prompt", placeholder="Write your message")
+            prompt = st.text_input("", key="create_prompt", placeholder="Write your message", label_visibility="collapsed")
         with col2:
-            st.markdown("<br>", unsafe_allow_html=True)  # Add space for alignment
             submitted = st.form_submit_button("Send", use_container_width=True)
         
         if submitted and prompt.strip():
@@ -231,7 +230,6 @@ if st.session_state.show_chat and st.session_state.selected_workflow:
         with col1:
             describe_prompt = st.text_input("Message", placeholder="Write your message", key="chat_input", label_visibility="collapsed")
         with col2:
-            st.markdown("<br>", unsafe_allow_html=True)  # for spacing
             send_clicked = st.form_submit_button("Send", use_container_width=True)
         
         if send_clicked and describe_prompt.strip():
